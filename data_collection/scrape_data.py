@@ -1,10 +1,10 @@
 import asyncio
 from playwright.async_api import async_playwright
-import time
+import json
 
 BASE_URL = "https://propertiesinyangon.com/rent/"
 
-async def scrape_page(page):
+async def scrape_page(page, scraped_ids):
     await page.wait_for_selector(".mh-property", timeout=10000)
     
     listings = await page.query_selector_all(".mh-property")
@@ -12,13 +12,7 @@ async def scrape_page(page):
     results = []
     for item in listings:
         try:
-            title_elem = await item.query_selector("h3.mh-estate-vertical__heading a")
-            title = await title_elem.inner_text() if title_elem else None
-            
-            price_elem = await item.query_selector(".mh-estate-vertical__primary > div")
-            price = await price_elem.inner_text() if price_elem else None
-
-            
+            # Get property ID first to check for duplicates
             pid_elem = None
             all_spans = await item.query_selector_all("span.mh-estate-vertical__more-info")
             for span in all_spans:
@@ -30,6 +24,19 @@ async def scrape_page(page):
             pid = await pid_elem.inner_text() if pid_elem else None
             if pid:
                 pid = pid.replace("Property ID:", "").strip()
+            
+            # Skip if already scraped
+            if pid in scraped_ids:
+                continue
+            
+            # Add to scraped IDs
+            scraped_ids.add(pid)
+            
+            title_elem = await item.query_selector("h3.mh-estate-vertical__heading a")
+            title = await title_elem.inner_text() if title_elem else None
+            
+            price_elem = await item.query_selector(".mh-estate-vertical__primary > div")
+            price = await price_elem.inner_text() if price_elem else None
             
             details = {}
             
@@ -68,7 +75,7 @@ async def scrape_page(page):
             print(f"Error scraping item: {e}")
             continue
     
-    return results
+    return results, scraped_ids
 
 
 async def run():
@@ -89,10 +96,10 @@ async def run():
         await page.wait_for_timeout(3000)
         
         all_data = []
+        scraped_ids = set()  # Track scraped property IDs
         i = 1
-        max_pages = 5 
         
-        while i < max_pages:
+        while True:
             print(f"\n--- Page {i} ---")
             
             try:
@@ -101,20 +108,16 @@ async def run():
                 print("No properties found on this page")
                 break
             
-            properties = await scrape_page(page)
+            properties, scraped_ids = await scrape_page(page, scraped_ids)
             all_data.extend(properties)
-            print(f"Collected {len(properties)} properties on this page")
+            print(f"Collected {len(properties)} new properties on this page")
             print(f"Total collected so far: {len(all_data)}")
             
             load_more_btn = await page.query_selector(".mh-search__more button")
             
             if not load_more_btn:
-                print("No 'Load more' button found. Looking for alternatives...")
-    
-                pagination = await page.query_selector(".mh-pagination")
-                if not pagination:
-                    print("No more content to load.")
-                    break
+                print("No 'Load more' button found.")
+                break
             
             print("Clicking 'Load more'...")
             try:
@@ -133,17 +136,8 @@ async def run():
             i += 1
         
         print(f"\n=== SCRAPING COMPLETE ===")
-        print(f"Total properties collected: {len(all_data)}")
-        
-        print("\nFirst 5 properties:")
-        for idx, p in enumerate(all_data[:5], 1):
-            print(f"\nProperty {idx}:")
-            print(f"  Title: {p['title']}")
-            print(f"  Price: {p['price']}")
-            print(f"  ID: {p['property_id']}")
-            print(f"  Details: {p['details']}")
-        
-        import json
+        print(f"Total unique properties collected: {len(all_data)}")
+
         with open("properties.json", "w", encoding="utf-8") as f:
             json.dump(all_data, f, indent=2, ensure_ascii=False)
         print(f"\nData saved to properties.json")
