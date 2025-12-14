@@ -1,0 +1,43 @@
+{
+  "AWSEBDockerrunVersion": 2,
+  "containerDefinitions": [
+    {
+      "name": "backend",
+      "image": "backend",
+      "memory": 256,
+      "environment": [
+        {
+          "name": "CORS_ORIGINS",
+          "value": "http://frontend"
+        }
+      ],
+      "essential": true,
+      "portMappings": [
+        {
+          "hostPort": 5000,
+          "containerPort": 5000
+        }
+      ],
+      "links": ["frontend"]
+    },
+    {
+      "name": "frontend",
+      "image": "frontend",
+      "memory": 256,
+      "environment": [
+        {
+          "name": "REACT_APP_API_URL",
+          "value": "http://backend:5000"
+        }
+      ],
+      "essential": true,
+      "portMappings": [
+        {
+          "hostPort": 80,
+          "containerPort": 3000
+        }
+      ],
+      "links": ["backend"]
+    }
+  ]
+}
