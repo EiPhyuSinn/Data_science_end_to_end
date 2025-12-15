@@ -1,6 +1,8 @@
 services:
   backend:
     build: ./backend
+    expose:
+      - "5000"
     environment:
       - CORS_ORIGINS=http://frontend
     networks:
@@ -8,11 +10,8 @@ services:
 
   frontend:
     build: ./frontend
-    labels:
-      - "com.amazonaws.elasticbeanstalk.ports=80"
-      - "com.amazonaws.elasticbeanstalk.container-port=80"
-    environment:
-      - REACT_APP_API_URL=http://backend:5000
+    ports:
+      - "80:80"
     depends_on:
       - backend
     networks:
