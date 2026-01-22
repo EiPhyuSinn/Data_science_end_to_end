@@ -2,3 +2,4 @@ venv
 data
 artifacts/
 real_estate_app/frontend/node_modules/
+docker_practice/
